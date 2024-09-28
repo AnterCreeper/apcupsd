@@ -4,15 +4,20 @@ import time
 import subprocess
 
 # Open Serial
-ser = serial.Serial('/dev/ttyUSB0', baudrate=2400, bytesize=8, parity='N', stopbits=1)
+ser = serial.Serial('/dev/ttyUSB0', baudrate=2400, bytesize=8, parity='N', stopbits=1, timeout=1)
 executed = False
 
 while True:
-    # Send "QS\r"
-    result = ser.write(b'QS\r')
-
-    # Read UPS Status
-    response = ser.read_until(b'\r').decode('ascii').strip()
+    while True:
+        # Send Command
+        result = ser.write(b'QS\r')
+        # Read UPS Status
+        response = ser.read_until(b'\r').decode('ascii').strip()
+        # If empty resend
+        if len(response) != 0 :
+            break
+        print("retry...")
+        time.sleep(0.1)
 
     # Parse Binary Data
     utilize = response.split()[3]
@@ -27,23 +32,23 @@ while True:
         # Power fail
         if not executed:
             executed = True
-            print("Power failed, going to low power mode...")
+            print("power failed, switch to low power mode...")
             subprocess.call(['/usr/bin/cpupower','frequency-set','-u','1.6G'])
     else:
         # Power online
         if executed:
             executed = False
-            print("Power online...")
+            print("power online.")
             subprocess.call(['/usr/bin/cpupower','frequency-set','-u','3.8G'])
 
     if flags & 0b00000001:
 	# Toggle Beep
-        print("Toggling Beep...")
+        print("toggling beep...")
         result = ser.write(b'Q\r')
 
     if flags & 0b01000000:
 	# Perform hibernate
-        print("Low power, ready to hibernate...")
+        print("low power, ready to hibernate...")
         subprocess.call(['/usr/bin/cpupower','frequency-set','-u','3.4G'])
         subprocess.call(['/usr/bin/systemctl','hibernate'])
 
